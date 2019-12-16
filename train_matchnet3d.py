@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from feat.dataloader.samplers import CategoriesSampler
-from feat.models.matchnet import MatchNet 
+from feat.models.matchnet import MatchNet3D
 from feat.utils import pprint, set_gpu, ensure_path, Averager, Timer, count_acc, euclidean_metric, compute_confidence_interval
 from tensorboardX import SummaryWriter
 
@@ -21,9 +21,9 @@ if __name__ == '__main__':
     parser.add_argument('--step_size', type=int, default=10)
     parser.add_argument('--gamma', type=float, default=0.2)    
     parser.add_argument('--temperature', type=float, default=1)
-    parser.add_argument('--use_bilstm', type=bool, default=False)
-    parser.add_argument('--model_type', type=str, default='ConvNet', choices=['ConvNet', 'ResNet'])
-    parser.add_argument('--dataset', type=str, default='MiniImageNet', choices=['MiniImageNet', 'CUB', 'TieredImageNet'])    
+    parser.add_argument('--use_bilstm', type=bool, default=True)
+    parser.add_argument('--model_type', type=str, default='ConvNet', choices=['ConvNet', 'ResNet', 'PointNet'])
+    parser.add_argument('--dataset', type=str, default='ModelNet', choices=['MiniImageNet', 'CUB', 'TieredImageNet', 'ModelNet'])    
     # MiniImageNet, ConvNet, './saves/initialization/miniimagenet/con-pre.pth'
     # MiniImageNet, ResNet, './saves/initialization/miniimagenet/res-pre.pth'
     # CUB, ConvNet, './saves/initialization/cub/con-pre.pth'    
@@ -49,6 +49,8 @@ if __name__ == '__main__':
         from feat.dataloader.cub import CUB as Dataset
     elif args.dataset == 'TieredImageNet':
         from feat.dataloader.tiered_imagenet import tieredImageNet as Dataset       
+    elif args.dataset == 'ModelNet':
+        from feat.dataloader.ModelNetDataLoader import ModelNetDataLoader as Dataset
     else:
         raise ValueError('Non-supported Dataset.')
     
@@ -60,11 +62,12 @@ if __name__ == '__main__':
     val_sampler = CategoriesSampler(valset.label, 500, args.way, args.shot + args.query)
     val_loader = DataLoader(dataset=valset, batch_sampler=val_sampler, num_workers=0, pin_memory=True)
     
-    model = MatchNet(args)
+    model = MatchNet3D(args)
+    model = torch.nn.DataParallel(model)
     if args.model_type == 'ConvNet':
         if args.use_bilstm:
-            optimizer = torch.optim.Adam([{'params': model.encoder.parameters()},
-                                         {'params': model.bilstm.parameters(), 'lr': args.lr * args.lr_mul}], lr=args.lr)            
+            optimizer = torch.optim.Adam([{'params': model.module.encoder.parameters()},
+                                         {'params': model.module.bilstm.parameters(), 'lr': args.lr * args.lr_mul}], lr=args.lr)            
         else:
             optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     elif args.model_type == 'ResNet':
@@ -72,7 +75,13 @@ if __name__ == '__main__':
             optimizer = torch.optim.SGD([{'params': model.encoder.parameters()},
                                          {'params': model.bilstm.parameters(), 'lr': args.lr * args.lr_mul}], lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)                
         else:        
-            optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)            
+            optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)   
+    elif args.model_type == 'PointNet':
+        if args.use_bilstm:
+            optimizer = torch.optim.SGD([{'params': model.encoder.parameters()},
+                                         {'params': model.bilstm.parameters(), 'lr': args.lr * args.lr_mul}], lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)                
+        else:        
+            optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)          
     else:
         raise ValueError('No Such Encoder')
     

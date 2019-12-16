@@ -1,5 +1,13 @@
 # Learning Embedding Adaptation for Few-Shot Learning
-The code repository for "[Learning Embedding Adaptation for Few-Shot Learning](https://arxiv.org/abs/1812.03664)" in PyTorch
+
+## Update
+**2019/12/16:**
+
+!!! Add 3D point cloud classification code train_matchnet3d.py
+
+Download alignment **ModelNet** [here](https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip) and save in `data/modelnet40_normal_resampled/`.
+
+
 
 ## Few-Shot Learning via Transformer
 
