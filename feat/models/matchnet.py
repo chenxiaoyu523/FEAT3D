@@ -136,3 +136,58 @@ class MatchNet3D(nn.Module):
         # compute inner product, batch inner product
         logitis = torch.bmm(refined_support, refined_query.permute([0,2,1])) / self.args.temperature # KqN x KN x d * KqN x d x 1
         return logitis # KqN x KN x 1
+
+class SparseMatchNet3D(nn.Module):
+    def __init__(self, args):
+        super(SparseMatchNet3D, self).__init__()
+        self.use_bilstm = args.use_bilstm
+        self.args = args # information about Shot and Way
+
+        layer_size = 320
+        from feat.networks.sparseconvnet import Model
+        self.encoder = Model(out_channels=layer_size)
+
+        if self.use_bilstm:
+            self.bilstm = BidirectionalLSTM(layer_sizes=[layer_size], 
+                batch_size=args.query * args.way, 
+                vector_dim=layer_size)
+
+    def forward(self, support_set, query_set):
+
+        support_loc=[]
+        for i in range(support_set.shape[0]):
+            support_loc.append(torch.cat([support_set[i,:,:3], (torch.ones(support_set.size(1),1)*i).cuda()], 1))
+        support_loc=torch.cat(support_loc).reshape(-1,4)
+        support_feat=support_set[:,:,3:].reshape(-1,3)
+
+        query_loc=[]
+        for i in range(query_set.shape[0]):
+            query_loc.append(torch.cat([query_set[i,:,:3], (torch.ones(query_set.size(1),1)*i).cuda()], 1))
+        query_loc=torch.cat(query_loc).reshape(-1,4)
+        query_feat=query_set[:,:,3:].reshape(-1,3)
+
+        # produce embeddings for support set images
+        support_set = self.encoder([support_loc, support_feat]) #KN x d
+        # produce embedding for target images
+        query_set = self.encoder([query_loc, query_feat]) # KqN x d    
+        
+        num_support = support_set.shape[0]
+        num_query = query_set.shape[0]
+        support_extend = support_set.unsqueeze(0).repeat([num_query, 1, 1])  # KqN x KN x d
+        query_extend = query_set.unsqueeze(1) # KqN x 1 x d
+        combined = torch.cat([support_extend, query_extend], 1) # KqN x (KN + 1) x d
+        
+        if self.use_bilstm:
+            # FCE embedding
+            combined = combined.permute([1,0,2]) # (KN + 1) x KqN x d
+            combined, hn, cn = self.bilstm(combined)
+            combined = combined.permute([1,0,2]) # KqN x (KN + 1) x d
+        
+        # get similarity between support set embeddings and target
+        refined_support, refined_query = combined.split((self.args.shot * self.args.way), 1) # KqN x     
+        
+        # compute cos similarity
+        refined_support = F.normalize(refined_support, dim = 2) # KqN x KN x d
+        # compute inner product, batch inner product
+        logitis = torch.bmm(refined_support, refined_query.permute([0,2,1])) / self.args.temperature # KqN x KN x d * KqN x d x 1
+        return logitis # KqN x KN x 1

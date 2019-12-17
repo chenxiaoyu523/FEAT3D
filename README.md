@@ -3,9 +3,15 @@
 ## Update
 **2019/12/16:**
 
-!!! Add 3D point cloud classification code train_matchnet3d.py
+!!! Add 3D point cloud classification method pointnet++ to train_matchnet3d.py
 
 Download alignment **ModelNet** [here](https://shapenet.cs.stanford.edu/media/modelnet40_normal_resampled.zip) and save in `data/modelnet40_normal_resampled/`.
+
+**2019/12/17:**
+
+!!! Add sparseconvnet to train_matchnet3d.py
+
+Just run " sh build.sh " to compile sparseconvnet module
 
 
 
