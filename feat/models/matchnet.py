@@ -138,14 +138,14 @@ class MatchNet3D(nn.Module):
         return logitis # KqN x KN x 1
 
 class SparseMatchNet3D(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, spatial_size=1023):
         super(SparseMatchNet3D, self).__init__()
         self.use_bilstm = args.use_bilstm
         self.args = args # information about Shot and Way
 
         layer_size = 320
         from feat.networks.sparseconvnet import Model
-        self.encoder = Model(out_channels=layer_size)
+        self.encoder = Model(out_channels=layer_size, spatial_size=spatial_size)
 
         if self.use_bilstm:
             self.bilstm = BidirectionalLSTM(layer_sizes=[layer_size], 
@@ -157,13 +157,13 @@ class SparseMatchNet3D(nn.Module):
         support_loc=[]
         for i in range(support_set.shape[0]):
             support_loc.append(torch.cat([support_set[i,:,:3], (torch.ones(support_set.size(1),1)*i).cuda()], 1))
-        support_loc=torch.cat(support_loc).reshape(-1,4)
+        support_loc=torch.cat(support_loc).reshape(-1,4).long()
         support_feat=support_set[:,:,3:].reshape(-1,3)
 
         query_loc=[]
         for i in range(query_set.shape[0]):
             query_loc.append(torch.cat([query_set[i,:,:3], (torch.ones(query_set.size(1),1)*i).cuda()], 1))
-        query_loc=torch.cat(query_loc).reshape(-1,4)
+        query_loc=torch.cat(query_loc).reshape(-1,4).long()
         query_feat=query_set[:,:,3:].reshape(-1,3)
 
         # produce embeddings for support set images

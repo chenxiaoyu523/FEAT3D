@@ -16,12 +16,12 @@ if __name__ == '__main__':
     parser.add_argument('--way', type=int, default=5)    
     parser.add_argument('--shot', type=int, default=1)
     parser.add_argument('--query', type=int, default=15)
-    parser.add_argument('--lr', type=float, default=0.0001)
+    parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--lr_mul', type=float, default=1) # lr is the basic learning rate, while lr * lr_mul is the lr for other parts
     parser.add_argument('--step_size', type=int, default=10)
     parser.add_argument('--gamma', type=float, default=0.2)    
     parser.add_argument('--temperature', type=float, default=1)
-    parser.add_argument('--use_bilstm', type=bool, default=True)
+    parser.add_argument('--use_bilstm', type=bool, default=False)
     parser.add_argument('--model_type', type=str, default='SparseConvNet', choices=['ConvNet', 'ResNet', 'PointNet++', 'SparseConvNet'])
     parser.add_argument('--dataset', type=str, default='ModelNet', choices=['MiniImageNet', 'CUB', 'TieredImageNet', 'ModelNet'])    
     # MiniImageNet, ConvNet, './saves/initialization/miniimagenet/con-pre.pth'
@@ -52,6 +52,7 @@ if __name__ == '__main__':
     elif args.dataset == 'ModelNet':
         if args.model_type == 'SparseConvNet':
             from feat.dataloader.ModelNetDataLoader_sparse import ModelNetDataLoader as Dataset
+            import feat.dataloader.ModelNetDataLoader_sparse as Datasetting
         elif args.model_type == 'PointNet++':
             from feat.dataloader.ModelNetDataLoader import ModelNetDataLoader as Dataset
         else:
@@ -68,7 +69,7 @@ if __name__ == '__main__':
     val_loader = DataLoader(dataset=valset, batch_sampler=val_sampler, num_workers=0, pin_memory=True)
     
     if args.model_type == 'SparseConvNet':
-        model = SparseMatchNet3D(args)
+        model = SparseMatchNet3D(args, spatial_size=Datasetting.full_scale)
     elif args.model_type == 'PointNet++':
         model = MatchNet3D(args)
     else:
@@ -95,10 +96,10 @@ if __name__ == '__main__':
             optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005) 
     elif args.model_type == 'SparseConvNet':
         if args.use_bilstm:
-            optimizer = torch.optim.SGD([{'params': model.encoder.parameters()},
-                                         {'params': model.bilstm.parameters(), 'lr': args.lr * args.lr_mul}], lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)                
+            optimizer = torch.optim.Adam([{'params': model.encoder.parameters()},
+                                         {'params': model.bilstm.parameters(), 'lr': args.lr * args.lr_mul}], lr=args.lr)                
         else:        
-            optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True, weight_decay=0.0005)          
+            optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)          
     else:
         raise ValueError('No Such Encoder')
     

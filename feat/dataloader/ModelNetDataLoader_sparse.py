@@ -10,7 +10,7 @@ warnings.filterwarnings('ignore')
 
 DATA_PATH = 'data/modelnet40_normal_resampled/'
 elastic_deformation=False
-full_scale=4096 #Input field size
+full_scale=255 #Input field size
 scale=20  #Voxel size = 1/scale
 
 #Elastic distortion
@@ -88,11 +88,12 @@ class ModelNetDataLoader(Dataset):
             cls = self.label[index]
             cls = np.array([cls]).astype(np.int32)
             point_set = np.loadtxt(fn[1], delimiter=',').astype(np.float32)
+            '''
             if self.uniform:
                 point_set = farthest_point_sample(point_set, self.npoints)
             else:
                 point_set = point_set[0:self.npoints,:]
-
+            '''
             point_set[:, 0:3] = pc_normalize(point_set[:, 0:3])
 
             if not self.normal_channel:
