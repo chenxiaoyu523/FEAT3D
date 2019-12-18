@@ -51,6 +51,7 @@ def farthest_point_sample(point, npoint):
 class ModelNetDataLoader(Dataset):
     def __init__(self, split, args, root=DATA_PATH,  npoint=1024, uniform=False, normal_channel=True, cache_size=15000):
         self.root = root
+        self.split = split
         self.npoints = npoint
         self.uniform = uniform
         self.catfile = os.path.join(self.root, 'modelnet40_shape_names.txt')
@@ -103,13 +104,16 @@ class ModelNetDataLoader(Dataset):
                 self.cache[index] = (point_set, cls)
 
             a = point_set[:,:3]
-            m=np.eye(3)+np.random.randn(3,3)*0.1
+            if self.split=='train':
+                m=np.eye(3)+np.random.randn(3,3)*0.1
+            else:
+                m=np.eye(3)
             m[0][0]*=np.random.randint(0,2)*2-1
             m*=scale
             #theta=np.random.rand()*2*math.pi
             #m=np.matmul(m,[[math.cos(theta),math.sin(theta),0],[-math.sin(theta),math.cos(theta),0],[0,0,1]])
             a=np.matmul(a,m)
-            if elastic_deformation:
+            if elastic_deformation & (self.split=='train'):
                 a=self.elastic(a,6*scale//50,40*scale/50)
                 a=self.elastic(a,20*scale//50,160*scale/50)
             m=a.min(0)
@@ -120,6 +124,9 @@ class ModelNetDataLoader(Dataset):
             idxs=(a.min(1)>=0)*(a.max(1)<full_scale)
 
             point_set = point_set[idxs]
+
+            if self.split=='train':
+                point_set[:,3:] = np.random.uniform(1,3)*0.1
 
             '''
             points = provider.random_point_dropout(np.expand_dims(point_set, 0))

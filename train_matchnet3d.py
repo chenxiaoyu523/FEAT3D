@@ -13,6 +13,7 @@ from tensorboardX import SummaryWriter
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--max_epoch', type=int, default=200)
+    parser.add_argument('--test_epoch', type=int, default=20)
     parser.add_argument('--way', type=int, default=5)    
     parser.add_argument('--shot', type=int, default=1)
     parser.add_argument('--query', type=int, default=15)
@@ -62,11 +63,11 @@ if __name__ == '__main__':
     
     trainset = Dataset('train', args)
     train_sampler = CategoriesSampler(trainset.label, 100, args.way, args.shot + args.query)
-    train_loader = DataLoader(dataset=trainset, batch_sampler=train_sampler, num_workers=8, pin_memory=True)
+    train_loader = DataLoader(dataset=trainset, batch_sampler=train_sampler, num_workers=20, pin_memory=True)
 
     valset = Dataset('val', args)
     val_sampler = CategoriesSampler(valset.label, 500, args.way, args.shot + args.query)
-    val_loader = DataLoader(dataset=valset, batch_sampler=val_sampler, num_workers=8, pin_memory=True)
+    val_loader = DataLoader(dataset=valset, batch_sampler=val_sampler, num_workers=20, pin_memory=True)
     
     if args.model_type == 'SparseConvNet':
         model = SparseMatchNet3D(args, spatial_size=Datasetting.full_scale)
@@ -186,51 +187,52 @@ if __name__ == '__main__':
         tl = tl.item()
         ta = ta.item()
 
-        model.eval()
+        if epoch % args.test_epoch==(args.test_epoch-1):
+            model.eval()
 
-        vl = Averager()
-        va = Averager()
+            vl = Averager()
+            va = Averager()
 
-        label = torch.arange(args.way).repeat(args.query)
-        if torch.cuda.is_available():
-            label = label.type(torch.cuda.LongTensor)
-        else:
-            label = label.type(torch.LongTensor)
-            
-        print('best epoch {}, best val acc={:.4f}'.format(trlog['max_acc_epoch'], trlog['max_acc']))
-        with torch.no_grad():
-            for i, batch in enumerate(val_loader, 1):
-                if torch.cuda.is_available():
-                    data, _ = [_.cuda() for _ in batch]
-                else:
-                    data = batch[0]
-                p = args.shot * args.way
-                data_shot, data_query = data[:p], data[p:]
-    
-                logits = model(data_shot, data_query) # KqN x KN x 1
-                # use logits to weights all labels, KN x N
-                prediction = torch.sum(torch.mul(logits, label_support_onehot.unsqueeze(0)), 1) # KqN x N
-                # compute loss
-                loss = F.cross_entropy(prediction, label)
-                acc = count_acc(prediction, label)
-                vl.add(loss.item())
-                va.add(acc)
+            label = torch.arange(args.way).repeat(args.query)
+            if torch.cuda.is_available():
+                label = label.type(torch.cuda.LongTensor)
+            else:
+                label = label.type(torch.LongTensor)
+                
+            print('best epoch {}, best val acc={:.4f}'.format(trlog['max_acc_epoch'], trlog['max_acc']))
+            with torch.no_grad():
+                for i, batch in enumerate(val_loader, 1):
+                    if torch.cuda.is_available():
+                        data, _ = [_.cuda() for _ in batch]
+                    else:
+                        data = batch[0]
+                    p = args.shot * args.way
+                    data_shot, data_query = data[:p], data[p:]
+        
+                    logits = model(data_shot, data_query) # KqN x KN x 1
+                    # use logits to weights all labels, KN x N
+                    prediction = torch.sum(torch.mul(logits, label_support_onehot.unsqueeze(0)), 1) # KqN x N
+                    # compute loss
+                    loss = F.cross_entropy(prediction, label)
+                    acc = count_acc(prediction, label)
+                    vl.add(loss.item())
+                    va.add(acc)
 
-        vl = vl.item()
-        va = va.item()
-        writer.add_scalar('data/val_loss', float(vl), epoch)
-        writer.add_scalar('data/val_acc', float(va), epoch)    
-        print('epoch {}, val, loss={:.4f} acc={:.4f}'.format(epoch, vl, va))
+            vl = vl.item()
+            va = va.item()
+            writer.add_scalar('data/val_loss', float(vl), epoch)
+            writer.add_scalar('data/val_acc', float(va), epoch)    
+            print('epoch {}, val, loss={:.4f} acc={:.4f}'.format(epoch, vl, va))
 
-        if va > trlog['max_acc']:
-            trlog['max_acc'] = va
-            trlog['max_acc_epoch'] = epoch
-            save_model('max_acc')
+            if va > trlog['max_acc']:
+                trlog['max_acc'] = va
+                trlog['max_acc_epoch'] = epoch
+                save_model('max_acc')
+            trlog['val_loss'].append(vl)
+            trlog['val_acc'].append(va)
 
         trlog['train_loss'].append(tl)
         trlog['train_acc'].append(ta)
-        trlog['val_loss'].append(vl)
-        trlog['val_acc'].append(va)
 
         torch.save(trlog, osp.join(args.save_path, 'trlog'))
 
@@ -243,7 +245,7 @@ if __name__ == '__main__':
     trlog = torch.load(osp.join(args.save_path, 'trlog'))
     test_set = Dataset('test', args)
     sampler = CategoriesSampler(test_set.label, 10000, args.way, args.shot + args.query)
-    loader = DataLoader(test_set, batch_sampler=sampler, num_workers=8, pin_memory=True)
+    loader = DataLoader(test_set, batch_sampler=sampler, num_workers=20, pin_memory=True)
     test_acc_record = np.zeros((10000,))
 
     model.load_state_dict(torch.load(osp.join(args.save_path, 'max_acc' + '.pth'))['params'])
