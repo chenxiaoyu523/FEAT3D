@@ -156,13 +156,13 @@ class SparseMatchNet3D(nn.Module):
 
         support_loc=[]
         for i in range(support_set.shape[0]):
-            support_loc.append(torch.cat([support_set[i,:,:3], (torch.ones(support_set.size(1),1)*i).cuda()], 1))
+            support_loc.append(torch.cat([support_set[i,:,:3], (torch.ones(support_set.size(1),1)*i).cuda()], 1).unsqueeze(0))
         support_loc=torch.cat(support_loc).reshape(-1,4).long()
         support_feat=support_set[:,:,3:].reshape(-1,3)
 
         query_loc=[]
         for i in range(query_set.shape[0]):
-            query_loc.append(torch.cat([query_set[i,:,:3], (torch.ones(query_set.size(1),1)*i).cuda()], 1))
+            query_loc.append(torch.cat([query_set[i,:,:3], (torch.ones(query_set.size(1),1)*i).cuda()], 1).unsqueeze(0))
         query_loc=torch.cat(query_loc).reshape(-1,4).long()
         query_feat=query_set[:,:,3:].reshape(-1,3)
 

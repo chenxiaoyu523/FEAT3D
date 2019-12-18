@@ -106,8 +106,8 @@ class ModelNetDataLoader(Dataset):
             m=np.eye(3)+np.random.randn(3,3)*0.1
             m[0][0]*=np.random.randint(0,2)*2-1
             m*=scale
-            theta=np.random.rand()*2*math.pi
-            m=np.matmul(m,[[math.cos(theta),math.sin(theta),0],[-math.sin(theta),math.cos(theta),0],[0,0,1]])
+            #theta=np.random.rand()*2*math.pi
+            #m=np.matmul(m,[[math.cos(theta),math.sin(theta),0],[-math.sin(theta),math.cos(theta),0],[0,0,1]])
             a=np.matmul(a,m)
             if elastic_deformation:
                 a=self.elastic(a,6*scale//50,40*scale/50)
